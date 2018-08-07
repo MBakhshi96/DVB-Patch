@@ -1,0 +1,44 @@
+From aadf98fa6138ea35cc4b99014379272320474adb Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Fri, 29 Sep 2017 15:47:00 +0800
+Subject: [PATCH 1/4] Revert "CVBS: disable cvbs function (KVIM2)"
+
+This reverts commit 2943223e103444177aabfc420af7248080b868d4.
+---
+ board/khadas/configs/kvim2.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/board/khadas/configs/kvim2.h b/board/khadas/configs/kvim2.h
+index 0bf39c3..1d1e7ac 100644
+--- a/board/khadas/configs/kvim2.h
++++ b/board/khadas/configs/kvim2.h
+@@ -90,6 +90,7 @@
+         "loadaddr=1080000\0"\
+         "outputmode=1080p60hz\0" \
+         "hdmimode=1080p60hz\0" \
++        "cvbsmode=576cvbs\0" \
+         "display_width=1920\0" \
+         "display_height=1080\0" \
+         "display_bpp=16\0" \
+@@ -111,6 +112,7 @@
+         "EnableSelinux=permissive\0"\
+         "recovery_part=recovery\0"\
+         "recovery_offset=0\0"\
++        "cvbs_drv=0\0"\
+         "active_slot=_a\0"\
+         "boot_part=boot\0"\
+         "initargs="\
+@@ -413,9 +415,7 @@
+ #define CONFIG_CMD_BMP 1
+ 
+ #if defined(CONFIG_AML_VOUT)
+-#ifdef CONFIG_AML_CVBS
+-#undef CONFIG_AML_CVBS
+-#endif
++#define CONFIG_AML_CVBS 1
+ #endif
+ 
+ /* USB
+-- 
+1.9.1
+

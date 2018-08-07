@@ -1,0 +1,163 @@
+From abbeb5ed2947597a96ece9045bf09825ce6baedc Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Wed, 30 Aug 2017 14:41:55 +0800
+Subject: [PATCH] DVB: add support for DVB
+
+---
+ core/java/android/view/KeyEvent.java               |  9 +++
+ core/res/AndroidManifest.xml                       | 21 +++++++
+ .../android/server/policy/PhoneWindowManager.java  | 70 ++++++++++++++++++++++
+ 3 files changed, 100 insertions(+)
+
+diff --git a/core/java/android/view/KeyEvent.java b/core/java/android/view/KeyEvent.java
+index b73acda..e8675ad 100644
+--- a/core/java/android/view/KeyEvent.java
++++ b/core/java/android/view/KeyEvent.java
+@@ -805,6 +805,15 @@ public class KeyEvent extends InputEvent implements Parcelable {
+     /** Key code constant: Consumed by the system for navigation right */
+     public static final int KEYCODE_SYSTEM_NAVIGATION_RIGHT = 283;
+ 
++    /** Key for dvb ***/
++    public static final int KEYCODE_DVB_TV_RADIO = 300;
++    public static final int KEYCODE_DVB_SAT      = 301;
++    public static final int KEYCODE_DVB_RECALL   = 302;
++    public static final int KEYCODE_DVB_REC      = 303;
++    public static final int KEYCODE_DVB_APPS     = 304;
++    public static final int KEYCODE_DVB_RECORD_LIST = 305;
++    public static final int KEYCODE_DVB_FAV = 306;
++
+     private static final int LAST_KEYCODE = KEYCODE_SYSTEM_NAVIGATION_RIGHT;
+ 
+     // NOTE: If you add a new keycode here you must also add it to:
+diff --git a/core/res/AndroidManifest.xml b/core/res/AndroidManifest.xml
+index 011884c..a66f2fd 100644
+--- a/core/res/AndroidManifest.xml
++++ b/core/res/AndroidManifest.xml
+@@ -493,6 +493,27 @@
+     <protected-broadcast android:name="com.android.server.retaildemo.ACTION_RESET_DEMO" />
+ 
+     <!-- ====================================================================== -->
++    <!--                          for dtv special  start                        -->
++    <!-- ====================================================================== -->
++
++    <protected-broadcast android:name="com.android.music.musicservicecommand.pause" />
++    <protected-broadcast android:name="com.dtv.player" />
++    <protected-broadcast android:name="com.dtv.stop" />
++    <protected-broadcast android:name="com.dtv.play.status" />
++    <protected-broadcast android:name="com.dtv.pswd.ok" />
++    <protected-broadcast android:name="com.dtv.mute.icon.show" />
++    <protected-broadcast android:name="com.dtv.mute.icon.hide" />
++    <protected-broadcast android:name="com.dtv.DTVLauncher.shortcuts_change" />
++    <protected-broadcast android:name="com.dtv.bookevent.showtimerdialog" />
++    <protected-broadcast android:name="com.dtv.timezone" />
++    <protected-broadcast android:name="com.dtv.REFRESH_CONNECT_STATUS" />
++    <protected-broadcast android:name="com.dtv.DEVICE_MOUNTED" />
++    <protected-broadcast android:name="com.dtv.DEVICE_REMOVED" />
++    <protected-broadcast android:name="com.dtv.data.factory.success" />
++
++    <!-- ====================================================================== -->
++    <!--                          for dtv special  end                          -->
++    <!-- ====================================================================== -->
+     <!--                          RUNTIME PERMISSIONS                           -->
+     <!-- ====================================================================== -->
+     <eat-comment />
+diff --git a/services/core/java/com/android/server/policy/PhoneWindowManager.java b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+index 01074f9..4e90726 100644
+--- a/services/core/java/com/android/server/policy/PhoneWindowManager.java
++++ b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+@@ -43,6 +43,7 @@ import android.app.ActivityManager.StackId;
+ import android.app.ActivityManagerInternal;
+ import android.app.ActivityManagerInternal.SleepToken;
+ import android.app.ActivityManagerNative;
++import android.app.ActivityManager.RunningTaskInfo;
+ import android.app.AppOpsManager;
+ import android.app.IUiModeManager;
+ import android.app.ProgressDialog;
+@@ -3435,8 +3436,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+                 dispatchDirectAudioEvent(event);
+                 return -1;
+             }
++        } else if(keyCode == KeyEvent.KEYCODE_DVB_SAT) { //Fast Link to DTV APK
++            startCustomApk("com.superdtv", "com.superdtv.DtvMainActivity");
+         }
+ 
++
+         // Toggle Caps Lock on META-ALT.
+         boolean actionTriggered = false;
+         if (KeyEvent.isModifierKey(keyCode)) {
+@@ -7424,6 +7428,72 @@ public class PhoneWindowManager implements WindowManagerPolicy {
+         startActivityAsUser(intent, UserHandle.CURRENT);
+     }
+ 
++    public boolean isForeground(final String cls) {
++        ActivityManager am = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
++        List<RunningTaskInfo> tasks = am.getRunningTasks(1);
++        if (!tasks.isEmpty()) {
++            ComponentName topActivity = tasks.get(0).topActivity;
++            if (topActivity.getPackageName().equals(cls)) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    public boolean tryBroughtClsToFront(final String cls, String activity) {
++        Intent intent = mContext.getPackageManager().getLaunchIntentForPackage(cls);
++        ActivityManager am = (ActivityManager) mContext.getSystemService(Context.ACTIVITY_SERVICE);
++        List<RunningTaskInfo> tasks = am.getRunningTasks(100);
++        for (RunningTaskInfo info : tasks) {
++                if (info.topActivity.getPackageName().equals(cls) || info.baseActivity.getPackageName().equals(cls)) {
++                    intent.setAction(Intent.ACTION_MAIN);
++                    intent.addCategory(Intent.CATEGORY_LAUNCHER);
++                    intent.setClassName(cls, activity);
++
++                    intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
++                            | Intent.FLAG_ACTIVITY_NEW_TASK
++                            | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
++                    mContext.startActivity(intent);
++
++                    return true;
++                }
++        }
++
++        return false;
++    }
++
++    private boolean isAppInstalled(String packageName) {
++        boolean installed = false;
++        try {
++            mContext.getPackageManager().getPackageInfo(packageName, PackageManager.GET_ACTIVITIES);
++            installed = true;
++        } catch (PackageManager.NameNotFoundException e) {
++            installed = false;
++		}
++        return installed;
++    }
++
++    void startCustomApk(String cls, String activity)
++    {
++        if(!isAppInstalled(cls))
++                return;
++
++        if(isForeground(cls))
++                return;
++
++        if(!tryBroughtClsToFront(cls,activity)){
++                awakenDreams();
++
++                Intent intent1 = new Intent();
++                intent1.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
++                        | Intent.FLAG_ACTIVITY_NEW_TASK
++                        | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
++                intent1.setClassName(cls, activity);
++
++                mContext.startActivityAsUser(intent1, UserHandle.CURRENT);
++        }
++    }
++
+     /**
+      * goes to the home screen
+      * @return whether it did anything
+-- 
+1.9.1
+

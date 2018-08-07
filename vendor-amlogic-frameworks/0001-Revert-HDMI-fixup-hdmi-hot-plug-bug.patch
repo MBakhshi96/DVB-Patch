@@ -1,0 +1,28 @@
+From b577373e1e1856209c16a71b6327ca053d1baa99 Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Fri, 29 Sep 2017 14:34:31 +0800
+Subject: [PATCH] Revert "HDMI: fixup hdmi hot plug bug"
+
+This reverts commit 0ad9c018e5f9fa14e71b566fd2ba42fd464cb1f3.
+---
+ services/systemcontrol/DisplayMode.cpp | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/services/systemcontrol/DisplayMode.cpp b/services/systemcontrol/DisplayMode.cpp
+index 20a2e89..5b28975 100644
+--- a/services/systemcontrol/DisplayMode.cpp
++++ b/services/systemcontrol/DisplayMode.cpp
+@@ -467,10 +467,6 @@ void DisplayMode::setSourceDisplay(output_mode_state state) {
+             pSysWrite->writeSysfs(DISPLAY_FB1_FREESCALE, "0");
+         }
+     }
+-    if (!strcmp(outputmode, "none")) {
+-       memset(outputmode, 0, sizeof(outputmode));
+-       strcpy(outputmode, data.current_mode);
+-    }
+     DetectDolbyVisionOutputMode(state, outputmode);
+     setSourceOutputMode(outputmode, state);
+ }
+-- 
+1.9.1
+

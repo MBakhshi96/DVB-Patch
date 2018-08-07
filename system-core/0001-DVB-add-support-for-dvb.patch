@@ -1,0 +1,25 @@
+From dcd89b616f10e5baf7c6230d4a02ee38d2804f3f Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Wed, 30 Aug 2017 14:19:35 +0800
+Subject: [PATCH] DVB: add support for dvb
+
+---
+ rootdir/etc/public.libraries.android.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/rootdir/etc/public.libraries.android.txt b/rootdir/etc/public.libraries.android.txt
+index e6c94ff..73be617 100644
+--- a/rootdir/etc/public.libraries.android.txt
++++ b/rootdir/etc/public.libraries.android.txt
+@@ -19,3 +19,8 @@ libstdc++.so
+ libvulkan.so
+ libwebviewchromium_plat_support.so
+ libz.so
++libamplayer.so
++libc++.so
++libcutils.so
++libskia.so
++libamadec.so
+-- 
+1.9.1
+

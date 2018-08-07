@@ -1,0 +1,21 @@
+This is the patch for VTV board
+
+example: 
+The directory 'device-khadas'
+
+1. Copy the file '0001-DVB-add-support-for-DVB.patch' to the directory 'device/khadas'
+
+  # copy device-khadas/0001-DVB-add-support-for-DVB.patch ~/$PROJECT/device/khadas
+
+2. Copy the file '0002-DVB-add-build-config-for-VTV-application-KVIM2.patch' to the directory 'device/khadas'
+
+  # copy device-khadas/0002-DVB-add-build-config-for-VTV-application-KVIM2.patch ~/$PROJECT/device/khadas
+
+3. Go to the directory 'device/khadas'
+
+  # cd ~/$PROJECT/device/khadas
+
+4. Apply the patch
+
+  # git am 0001-DVB-add-support-for-DVB.patch
+  # git am 0002-DVB-add-build-config-for-VTV-application-KVIM2.patch

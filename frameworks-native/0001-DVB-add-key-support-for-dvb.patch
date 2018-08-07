@@ -1,0 +1,51 @@
+From 07e54a643c1b8da8b93297cd7c10bd538e01fe1b Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Sat, 30 Sep 2017 15:17:02 +0800
+Subject: [PATCH] DVB: add key support for dvb
+
+---
+ include/android/keycodes.h       | 9 +++++++++
+ include/input/InputEventLabels.h | 7 +++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/include/android/keycodes.h b/include/android/keycodes.h
+index 6a7ad54..1013821 100644
+--- a/include/android/keycodes.h
++++ b/include/android/keycodes.h
+@@ -767,6 +767,15 @@ enum {
+     /** fingerprint navigation key, right. */
+     AKEYCODE_SYSTEM_NAVIGATION_RIGHT = 283,
+ 
++    /** key for dvb **/
++    AKEYCODE_DVB_TV_RADIO = 300,
++    AKEYCODE_DVB_SAT = 301,
++    AKEYCODE_DVB_RECALL = 302,
++    AKEYCODE_DVB_REC = 303,
++    AKEYCODE_DVB_APPS = 304,
++    AKEYCODE_DVB_RECORD_LIST = 305,
++    AKEYCODE_DVB_FAV =306,
++
+     AKEYCODE_TV_SHORTCUTKEY_GLOBALSETUP = 2001,
+     AKEYCODE_TV_SHORTCUTKEY_SOURCE_LIST = 2002,
+     AKEYCODE_TV_SHORTCUTKEY_3DMODE = 2003,
+diff --git a/include/input/InputEventLabels.h b/include/input/InputEventLabels.h
+index f485ccc..f28b634 100644
+--- a/include/input/InputEventLabels.h
++++ b/include/input/InputEventLabels.h
+@@ -323,6 +323,13 @@ static const InputEventLabel KEYCODES[] = {
+     DEFINE_KEYCODE(SYSTEM_NAVIGATION_DOWN),
+     DEFINE_KEYCODE(SYSTEM_NAVIGATION_LEFT),
+     DEFINE_KEYCODE(SYSTEM_NAVIGATION_RIGHT),
++    DEFINE_KEYCODE(DVB_TV_RADIO),
++    DEFINE_KEYCODE(DVB_SAT),
++    DEFINE_KEYCODE(DVB_RECALL),
++    DEFINE_KEYCODE(DVB_REC),
++    DEFINE_KEYCODE(DVB_APPS),
++    DEFINE_KEYCODE(DVB_RECORD_LIST),
++    DEFINE_KEYCODE(DVB_FAV),
+     DEFINE_KEYCODE(TV_SHORTCUTKEY_GLOBALSETUP),
+     DEFINE_KEYCODE(TV_SHORTCUTKEY_SOURCE_LIST),
+     DEFINE_KEYCODE(TV_SHORTCUTKEY_3DMODE),
+-- 
+1.9.1
+

@@ -1,0 +1,35 @@
+From ece916ffd5c4b398b49e3dd156ad02b64a55ef9e Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Thu, 31 Aug 2017 16:27:17 +0800
+Subject: [PATCH 2/3] DVB: add build config for VTV application (KVIM2)
+
+---
+ kvim2/kvim2.mk | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/kvim2/kvim2.mk b/kvim2/kvim2.mk
+index 7551ddd..fd1d40a 100644
+--- a/kvim2/kvim2.mk
++++ b/kvim2/kvim2.mk
+@@ -306,6 +306,18 @@ endif
+ #########################################################################
+ BUILD_WITH_ROOT_CONFIG :=false
+ BUILD_WITH_GAPPS_CONFIG :=false
++BUILD_WITH_DVB_APP := true
++
++ifeq ($(BUILD_WITH_DVB_APP),true)
++PRODUCT_PACKAGES += \
++    VTV
++
++PRODUCT_COPY_FILES += \
++    vendor/amlogic/prebuilt/VTV/lib64/libcom_superdtv_external_c.so:system/lib64/libcom_superdtv_external_c.so \
++    vendor/amlogic/prebuilt/VTV/lib64/libcom_superdtv_other.so:system/lib64/libcom_superdtv_other.so \
++    vendor/amlogic/prebuilt/VTV/lib64/libcom_superdtv_mw.so:system/lib64/libcom_superdtv_mw.so \
++    vendor/amlogic/prebuilt/VTV/lib64/libcom_superdtv_pi.so:system/lib64/libcom_superdtv_pi.so
++endif
+ 
+ #########################################################################
+ #
+-- 
+1.9.1
+

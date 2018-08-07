@@ -1,0 +1,1021 @@
+From 5057d97caed5030e7ad5430f305857ff5df78cc4 Mon Sep 17 00:00:00 2001
+From: terry <terry@szwesion.com>
+Date: Wed, 30 Aug 2017 17:32:35 +0800
+Subject: [PATCH] DVB: add support for DVB (KVIM2)
+
+---
+ arch/arm64/boot/dts/amlogic/mesongxm.dtsi   |  61 ++-
+ arch/arm64/boot/dts/kvim2.dts               |  51 +++
+ drivers/amlogic/amports/timestamp.c         |  19 +
+ drivers/amlogic/amports/tsync_pcr.c         |  69 ++--
+ drivers/amlogic/dvb_tv/Makefile             |   2 +-
+ drivers/amlogic/dvb_tv/dtv_params.c         | 581 ++++++++++++++++++++++++++++
+ drivers/amlogic/input/remote/remote_meson.c |   9 +-
+ include/linux/amlogic/amports/timestamp.h   |   2 +
+ 8 files changed, 762 insertions(+), 32 deletions(-)
+ create mode 100644 drivers/amlogic/dvb_tv/dtv_params.c
+
+diff --git a/arch/arm64/boot/dts/amlogic/mesongxm.dtsi b/arch/arm64/boot/dts/amlogic/mesongxm.dtsi
+index d290159..c419398 100644
+--- a/arch/arm64/boot/dts/amlogic/mesongxm.dtsi
++++ b/arch/arm64/boot/dts/amlogic/mesongxm.dtsi
+@@ -777,8 +777,9 @@
+ 	};
+ 
+ 	custom_maps:custom_maps {
+-		mapnum = <1>;
++		mapnum = <2>;
+ 		map0 = <&map_0>;
++		map1 = <&map_1>;
+ 		map_0: map_0{
+ 			mapname = "khadas-ir";
+ 			customcode = <0xff00>;
+@@ -805,6 +806,64 @@
+ 				REMOTE_KEY(0x01,158)
+ 				REMOTE_KEY(0x48,102)>;
+ 		};
++
++		map_1: map_1{
++			mapname = "dvb-ir";
++			customcode = <0xfe01>;
++			release_delay = <80>;
++			fn_key_scancode = <0x0d>;
++			cursor_left_scancode = <0x54>;
++			cursor_right_scancode = <0x15>;
++			cursor_up_scancode = <0x59>;
++			cursor_down_scancode = <0x51>;
++			cursor_ok_scancode = <0x55>;
++			size  = <45>;
++			keymap = <REMOTE_KEY(0x0d,272)
++				REMOTE_KEY(0x00,116)
++				REMOTE_KEY(0x50,102)
++				REMOTE_KEY(0x41,113)
++				REMOTE_KEY(0x48,115)
++				REMOTE_KEY(0x0b,114)
++				REMOTE_KEY(0x58,139)
++				REMOTE_KEY(0x59,103)
++				REMOTE_KEY(0x51,108)
++				REMOTE_KEY(0x54,105)
++				REMOTE_KEY(0x15,106)
++				REMOTE_KEY(0x55,232)
++				REMOTE_KEY(0x1e,11)
++				REMOTE_KEY(0x13,2)
++				REMOTE_KEY(0x12,3)
++				REMOTE_KEY(0x10,4)
++				REMOTE_KEY(0x17,5)
++				REMOTE_KEY(0x16,6)
++				REMOTE_KEY(0x14,7)
++				REMOTE_KEY(0x1b,8)
++				REMOTE_KEY(0x1a,9)
++				REMOTE_KEY(0x18,10)
++				REMOTE_KEY(0x11,14)
++				REMOTE_KEY(0x07,128)
++				REMOTE_KEY(0x40,121)
++				REMOTE_KEY(0x03,120)
++				REMOTE_KEY(0x01,123)
++				REMOTE_KEY(0x05,122)
++				REMOTE_KEY(0x44,119)
++				REMOTE_KEY(0x19,158)
++				REMOTE_KEY(0x04,104)
++				REMOTE_KEY(0x06,109)
++				REMOTE_KEY(0x5c,365)
++				REMOTE_KEY(0x1d,358)
++				REMOTE_KEY(0x0a,398)
++				REMOTE_KEY(0x4d,399)
++				REMOTE_KEY(0x0e,400)
++				REMOTE_KEY(0x0c,401)
++				REMOTE_KEY(0x1c,750)
++				REMOTE_KEY(0x08,751)
++				REMOTE_KEY(0x45,752)
++				REMOTE_KEY(0x1f,753)
++				REMOTE_KEY(0x4c,754)
++				REMOTE_KEY(0x49,755)
++				REMOTE_KEY(0x09,756)>;
++		};
+  	};
+ 
+ 	rng {
+diff --git a/arch/arm64/boot/dts/kvim2.dts b/arch/arm64/boot/dts/kvim2.dts
+index f53ad46..003d4f4 100644
+--- a/arch/arm64/boot/dts/kvim2.dts
++++ b/arch/arm64/boot/dts/kvim2.dts
+@@ -1167,6 +1167,34 @@
+ 			};
+ 		};
+ 	};
++
++	dvb {
++		compatible = "amlogic, dvb";
++		dev_name = "dvb";
++		ts0 = "serial";
++		ts0_control = <0>;
++		ts0_invert = <0>;
++		pinctrl-names = "p_ts0", "s_ts0", "s_ts1";
++		pinctrl-0 = <&dvb_p_ts0_pins>;
++		pinctrl-1 = <&dvb_s_ts0_pins>;
++		pinctrl-2 = <&dvb_s_ts1_pins>;
++		resets = <&clock GCLK_IDX_DEMUX
++				&clock GCLK_IDX_ASYNC_FIFO
++				&clock GCLK_IDX_AHB_ARB0
++				&clock GCLK_IDX_HIU_PARSER_TOP>;
++		reset-names = "demux", "asyncfifo", "ahbarb0", "uparsertop";
++	};
++
++
++	dtv_params {
++		compatible = "dtv-params";
++		dev_name = "dtv-params";
++		demod_reset_1-gpio = <&gpio  GPIODV_12  0>;
++		ant_power_1-gpio = <&gpio  GPIODV_20  0>;
++		user_defined_1-gpio = <&gpio  GPIODV_11  0>;//ant overload
++		pinctrl-names = "default";
++		pinctrl-0 = <&dtv_params_pins>;
++	};
+ };
+ 
+ &pinmux {
+@@ -1188,6 +1216,29 @@
+ 		amlogic,clrmask=<5 0x3c33>;
+ 		amlogic,pins ="GPIOX_8", "GPIOX_9", "GPIOX_10", "GPIOX_11";
+ 	};
++
++	dvb_p_ts0_pins: dvb_p_ts0_pins {
++		amlogic,setmask = <2 0x1f>;
++		amlogic,clrmask = <3 0x787 2 0xff000400>;
++		amlogic,pins = "GPIODV_0","GPIODV_1","GPIODV_2","GPIODV_3","GPIODV_4","GPIODV_5","GPIODV_6","GPIODV_7","GPIODV_8","GPIODV_9","GPIODV_10";
++	};
++
++	dvb_s_ts0_pins: dvb_s_ts0_pins {
++		amlogic,setmask = <2 0x17>;
++		amlogic,clrmask = <3 0x584 2 0x7000000 1 0x100>;
++		amlogic,pins = "GPIODV_0","GPIODV_8","GPIODV_9","GPIODV_10";
++	};
++
++	dvb_s_ts1_pins:dvb_s_ts1_pins{
++		amlogic,setmask = <3 0x17>;
++		amlogic,clrmask = <2 0xf0000 1 0x7>;
++		amlogic,pins = "GPIODV_0","GPIODV_8","GPIODV_9","GPIODV_10";
++	};
++
++	dtv_params_pins:dtv_params_pin{
++		amlogic,clrmask=<1 0xC2000000 2 0xC00400 3 0xA0>;
++		amlogic,pins = "GPIODV_11", "GPIODV_12", "GPIODV_20";
++	};
+ };
+ &efuse {
+ 	status = "ok";
+diff --git a/drivers/amlogic/amports/timestamp.c b/drivers/amlogic/amports/timestamp.c
+index ad6518e..fa9031f 100644
+--- a/drivers/amlogic/amports/timestamp.c
++++ b/drivers/amlogic/amports/timestamp.c
+@@ -21,6 +21,9 @@
+ #include "arch/register.h"
+ #include "amports_priv.h"
+ 
++#include <linux/amlogic/vout/vinfo.h>
++#include <linux/amlogic/vout/vout_notify.h>
++
+ 
+ u32 acc_apts_inc = 0;
+ u32 acc_apts_dec = 0;
+@@ -200,6 +203,22 @@ void timestamp_pcrscr_set_adj(s32 inc)
+ }
+ EXPORT_SYMBOL(timestamp_pcrscr_set_adj);
+ 
++void timestamp_pcrscr_set_adj_pcr(s32 inc)
++{
++   const struct vinfo_s *info = get_current_vinfo();
++   if (inc != 0) {
++       system_time_inc_adj =
++       900 * info->sync_duration_den / (info->sync_duration_num*inc);
++   }
++   else
++   {
++       system_time_inc_adj = 0;
++   }
++   if (system_time_inc_adj != 0)
++       pr_info("----system_time_inc_adj=%d----\n",system_time_inc_adj);
++}
++EXPORT_SYMBOL(timestamp_pcrscr_set_adj_pcr);
++
+ void timestamp_pcrscr_enable(u32 enable)
+ {
+ 	system_time_up = enable;
+diff --git a/drivers/amlogic/amports/tsync_pcr.c b/drivers/amlogic/amports/tsync_pcr.c
+index 16c1256..874e9d9 100644
+--- a/drivers/amlogic/amports/tsync_pcr.c
++++ b/drivers/amlogic/amports/tsync_pcr.c
+@@ -133,7 +133,7 @@ static u32 tsync_pcr_min_cache_time = TIME_UNIT90K * 0.4;    /* 0.2 */
+ static u32 tsync_pcr_max_delay_time = TIME_UNIT90K * 3;
+ static u32 tsync_pcr_up_delay_time = TIME_UNIT90K * 2;
+ static u32 tsync_pcr_down_delay_time = TIME_UNIT90K * 1.5;
+-static u32 tsync_pcr_min_delay_time = TIME_UNIT90K * 0.8;
++static u32 tsync_pcr_min_delay_time = TIME_UNIT90K * 1;
+ 
+ static u32 tsync_apts_adj_value = 150000;  /* add it by dolby av sync */
+ static u32 tsync_pcr_adj_value = 27000;  /* 300ms*/
+@@ -184,6 +184,7 @@ static int vbuf_size;
+ static int play_mode = PLAY_MODE_NORMAL;
+ static u8 tsync_pcr_started;
+ static int tsync_pcr_read_cnt;
++static int tsync_audio_start = 0;
+ static u8 tsync_pcr_usepcr = 1;
+ /* static int tsync_pcr_debug_pcrscr = 100; */
+ static u64 first_time_record;
+@@ -320,7 +321,7 @@ u32 tsync_pcr_get_min_checkinpts(void)
+ {
+ 	u32 last_checkin_vpts = get_last_checkin_pts(PTS_TYPE_VIDEO);
+ 	u32 last_checkin_apts = get_last_checkin_pts(PTS_TYPE_AUDIO);
+-	if (last_checkin_apts > 0 && last_checkin_apts > 0)
++	if (last_checkin_vpts > 0 && last_checkin_apts > 0)
+ 		return min(last_checkin_vpts, last_checkin_apts);
+ 	else if (last_checkin_apts > 0)
+ 		return last_checkin_apts;
+@@ -421,6 +422,8 @@ void tsync_pcr_pcrscr_set(void)
+ 		timestamp_pcrscr_set(ref_pcr);
+ 		if (cur_pcr > 0)
+ 			tsync_pcr_usepcr = 1;
++        else
++            tsync_pcr_usepcr = 0;
+ 
+ 		timestamp_pcrscr_enable(1);
+ 		pr_info
+@@ -444,6 +447,8 @@ void tsync_pcr_pcrscr_set(void)
+ 		timestamp_pcrscr_set(ref_pcr);
+ 		if (cur_pcr > 0)
+ 			tsync_pcr_usepcr = 1;
++        else
++			tsync_pcr_usepcr = 0;
+ 
+ 		timestamp_pcrscr_enable(1);
+ 		pr_info
+@@ -635,6 +640,7 @@ void tsync_pcr_avevent_locked(enum avevent_e event, u32 param)
+ 
+ 		timestamp_pcrscr_set(cur_pcr);
+ 
++		tsync_audio_start = 1;
+ 		pr_info("after audio:cur_pcr =0x%x,cur_apts=0x%x,cur_vpts=0x%x\n",
+ 			timestamp_pcrscr_get(), cur_apts, cur_vpts);
+ 		pr_info("after audio:last_pcr=0x%x,first_vpts=0x%x,first_checkinvpts=0x%x\n",
+@@ -720,7 +726,8 @@ static unsigned long tsync_pcr_check(void)
+ 	if (tsync_get_mode() != TSYNC_MODE_PCRMASTER
+ 		|| tsync_pcr_freerun_mode == 1)
+ 		return res;
+-
++    if(tsync_audio_start == 0)
++        return res;
+ 	tsdemux_pcr = tsdemux_pcrscr_get();
+ 	if (tsync_pcr_usepcr == 1) {
+ 		/* To monitor the pcr discontinue */
+@@ -1054,18 +1061,32 @@ static unsigned long tsync_pcr_check(void)
+ 		/* u32 ref_pcr=tsdemux_pcr-calculation_vcached_delayed(); */
+ 		u64 ref_pcr = (u64)  tsdemux_pcr;
+ 		u64 cur_pcr = (u64) timestamp_pcrscr_get();
++        u64 cur_checkin_apts =  get_last_checkin_pts(PTS_TYPE_AUDIO);
++        u64 cur_checkout_apts= get_last_checkout_pts(PTS_TYPE_AUDIO);
++        u64 cur_checkin_vpts = get_last_checkin_pts(PTS_TYPE_VIDEO);
++        u64 cur_checkout_vpts = get_last_checkout_pts(PTS_TYPE_VIDEO);
+ 		int64_t cur_delta = (int64_t) ref_pcr - (int64_t) cur_pcr;
+ 		/* int64_t diff = (cur_delta - tsync_pcr_stream_delta); */
+-		int64_t diff = cur_delta;
+-
++        int64_t pcr_diff = cur_delta;
++        int64_t apts_diff = (int64_t)cur_checkin_apts - (int64_t)cur_checkout_apts;
++        int64_t vpts_diff = (int64_t)cur_checkin_vpts -(int64_t)cur_checkout_vpts;
++        unsigned int fast_flag = 0;
++        unsigned int slow_flag = 0;
++
++        if((pcr_diff > tsync_pcr_max_cache_time) && (apts_diff > tsync_pcr_max_cache_time)&&
++               (vpts_diff > tsync_pcr_max_cache_time))
++               fast_flag = 1;
++
++        if((pcr_diff  < tsync_pcr_min_cache_time) && (apts_diff < tsync_pcr_min_cache_time)&&
++            (vpts_diff < tsync_pcr_min_cache_time))
++                slow_flag = 1;
+ 		/* if(diff > OPEN_RECOVERY_THRESHOLD && cur_pcr<ref_pcr
+ 		   && play_mode!=PLAY_MODE_SPEED && need_recovery){ */
+-		if ((diff > (tsync_pcr_max_cache_time))
+-			&& (play_mode != PLAY_MODE_SPEED) && need_recovery) {
++		if (fast_flag&& (play_mode != PLAY_MODE_SPEED) && need_recovery) {
+ 			play_mode = PLAY_MODE_SPEED;
+ 			amlog_level(LOG_LEVEL_INFO,
+-				"[%s] diff=%lld to speed play\n",
+-				__func__, diff);
++				"[%s] pcr_diff=%lld to speed play\n",
++				__func__, pcr_diff);
+ 			amlog_level(LOG_LEVEL_INFO,
+ 				"[%s] ref_pcr=%lld to speed play\n",
+ 				__func__, ref_pcr);
+@@ -1078,13 +1099,11 @@ static unsigned long tsync_pcr_check(void)
+ 		}
+ 		/* else if(diff > OPEN_RECOVERY_THRESHOLD && cur_pcr>ref_pcr
+ 		   && play_mode!=PLAY_MODE_SLOW && need_recovery){ */
+-		else if (diff < (tsync_pcr_min_cache_time)
+-				 && (play_mode != PLAY_MODE_SLOW)
+-				 && need_recovery) {
++		else if ( slow_flag && (play_mode != PLAY_MODE_SLOW)) {
+ 			play_mode = PLAY_MODE_SLOW;
+ 			amlog_level(LOG_LEVEL_INFO,
+-				"[%s] diff=%lld to slow play\n",
+-				__func__, diff);
++				"[%s] pcr_diff=%lld to slow play\n",
++				__func__, pcr_diff);
+ 			amlog_level(LOG_LEVEL_INFO,
+ 				"[%s] ref_pcr=%lld to slow play\n",
+ 				__func__, ref_pcr);
+@@ -1095,8 +1114,7 @@ static unsigned long tsync_pcr_check(void)
+ 				"[%s] cur_delta=%lld to slow play\n",
+ 				__func__, cur_delta);
+ 		} else if ((!need_recovery
+-				  || ((tsync_pcr_down_cache_time < diff)
+-					  && (diff < tsync_pcr_up_cache_time)))
++					|| ((fast_flag == 0) && (slow_flag == 0)))
+ 				 && (play_mode != PLAY_MODE_NORMAL)) {
+ 			play_mode = PLAY_MODE_NORMAL;
+ 			amlog_level(LOG_LEVEL_INFO,
+@@ -1109,8 +1127,8 @@ static unsigned long tsync_pcr_check(void)
+ 				"[%s]cur_delta=%lld to nomal play\n",
+ 				__func__, cur_delta);
+ 			amlog_level(LOG_LEVEL_INFO,
+-				"[%s]diff=%lld,need_recovery=%d to nomal play\n",
+-				__func__, diff, need_recovery);
++				"[%s]pcr_diff=%lld,need_recovery=%d to nomal play\n",
++				__func__, pcr_diff, need_recovery);
+ 		}
+ 	} else if ((play_mode != PLAY_MODE_FORCE_SLOW)
+ 			   && (play_mode != PLAY_MODE_FORCE_SPEED)
+@@ -1146,17 +1164,15 @@ static unsigned long tsync_pcr_check(void)
+ 
+ 	if (need_recovery && !tsync_pcr_vpause_flag) {
+ 		if (play_mode == PLAY_MODE_SLOW) {
+-			timestamp_pcrscr_set(timestamp_pcrscr_get() -
+-					tsync_pcr_recovery_span);
++			timestamp_pcrscr_set_adj_pcr(-1);
+ 		} else if (play_mode == PLAY_MODE_FORCE_SLOW) {
+-			timestamp_pcrscr_set(timestamp_pcrscr_get() -
+-					FORCE_RECOVERY_SPAN);
++			timestamp_pcrscr_set_adj_pcr(-2);
+ 		} else if (play_mode == PLAY_MODE_SPEED) {
+-			timestamp_pcrscr_set(timestamp_pcrscr_get() +
+-					tsync_pcr_recovery_span);
++			timestamp_pcrscr_set_adj_pcr(1);
+ 		} else if (play_mode == PLAY_MODE_FORCE_SPEED) {
+-			timestamp_pcrscr_set(timestamp_pcrscr_get() +
+-					FORCE_RECOVERY_SPAN);
++			timestamp_pcrscr_set_adj_pcr(2);
++		} else if (play_mode == PLAY_MODE_NORMAL) {
++			timestamp_pcrscr_set_adj_pcr(0);
+ 		}
+ 	}
+ 	/* } */
+@@ -1256,6 +1272,7 @@ void tsync_pcr_stop(void)
+ 	}
+ 	tsync_pcr_freerun_mode = 0;
+ 	tsync_pcr_started = 0;
++	tsync_audio_start = 0;
+ }
+ 
+ /* ------------------------------------------------------------------------ */
+diff --git a/drivers/amlogic/dvb_tv/Makefile b/drivers/amlogic/dvb_tv/Makefile
+index 7d56628..63e658a 100644
+--- a/drivers/amlogic/dvb_tv/Makefile
++++ b/drivers/amlogic/dvb_tv/Makefile
+@@ -4,7 +4,7 @@
+ 
+ obj-$(CONFIG_AM_DVB) += aml.o
+ 
+-aml-objs=aml_dvb.o aml_dmx.o
++aml-objs=aml_dvb.o aml_dmx.o dtv_params.o
+ 
+ obj-$(CONFIG_AM_DVB) += aml_fe.o
+ 
+diff --git a/drivers/amlogic/dvb_tv/dtv_params.c b/drivers/amlogic/dvb_tv/dtv_params.c
+new file mode 100644
+index 0000000..46425e9
+--- /dev/null
++++ b/drivers/amlogic/dvb_tv/dtv_params.c
+@@ -0,0 +1,581 @@
++#include <linux/i2c.h>
++#include <linux/i2c-algo-bit.h>
++#include <linux/i2c-gpio.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++
++#define pr_dbg(args...)\
++    do {\
++        printk(args);\
++    } while (0)
++#define pr_error(fmt, args...) printk("dtv_params: " fmt, ## args)
++#define pr_inf(fmt, args...)   printk("dtv_params: " fmt, ## args)
++
++
++static struct pinctrl *s_pinctrl = NULL;
++
++static unsigned int s_demodReset_1_Pin, s_antPower_1_Pin, s_demodReset_2_Pin, s_antPower_2_Pin, s_tunerPowerEnable_1_Pin, s_tunerPowerEnable_2_Pin, s_userDefined_1_Pin, s_userDefined_2_Pin;
++static unsigned char demodPin_1_Detected = 0, antPowerPin_1_Detected = 0, demodPin_2_Detected = 0, antPowerPin_2_Detected = 0, tunerPowerEnablePin_1_Detected = 0, tunerPowerEnablePin_2_Detected = 0, userDefined_1_Detected = 0, userDefined_2_Detected = 0;
++
++static void set_demod_reset_1_pin(unsigned char val)
++{
++    if(demodPin_1_Detected){
++        gpio_set_value(s_demodReset_1_Pin, val);
++        pr_err("set_demod_reset_1_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : demod reset 1 pin not config..\r\n");
++    }
++}
++
++static void set_ant_power_1_pin(unsigned char val)
++{
++    if(antPowerPin_1_Detected){
++        gpio_set_value(s_antPower_1_Pin, val);
++        pr_err("set_ant_power_1_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : ant power 1 pin not config..\r\n");
++    }
++}
++
++static void set_demod_reset_2_pin(unsigned char val)
++{
++    if(demodPin_2_Detected){
++        gpio_set_value(s_demodReset_2_Pin, val);
++        pr_err("set_demod_reset_2_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : demod reset 2 pin not config..\r\n");
++    }
++}
++
++static void set_ant_power_2_pin(unsigned char val)
++{
++    if(antPowerPin_2_Detected){
++        gpio_set_value(s_antPower_2_Pin, val);
++        pr_err("set_ant_power_2_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : ant power 2 pin not config..\r\n");
++    }
++}
++
++static void set_tuner_power_enable_1_pin(unsigned char val)
++{
++    if(tunerPowerEnablePin_1_Detected){
++        gpio_set_value(s_tunerPowerEnable_1_Pin, val);
++        pr_err("set_tuner_power_enable_1_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : tuner power enable 1 pin not config..\r\n");
++    }
++}
++
++static void set_tuner_power_enable_2_pin(unsigned char val)
++{
++    if(tunerPowerEnablePin_2_Detected){
++        gpio_set_value(s_tunerPowerEnable_2_Pin, val);
++        pr_err("set_tuner_power_enable_2_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : tuner power enable 2 pin not config..\r\n");
++    }
++}
++
++static void set_user_defined_1_pin(unsigned char val)
++{
++    if(userDefined_1_Detected){
++        gpio_set_value(s_userDefined_1_Pin, val);
++        pr_err("set_user_defined_1_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : user defined 1 pin not config..\r\n");
++    }
++}
++
++static void set_user_defined_2_pin(unsigned char val)
++{
++    if(userDefined_2_Detected){
++        gpio_set_value(s_userDefined_2_Pin, val);
++        pr_err("set_user_defined_2_pin : %d\r\n", val);
++    }
++    else{
++        pr_err("error : user defined 2 pin not config..\r\n");
++    }
++}
++
++static int get_demod_reset_1_pin(void)
++{
++    int val = 0;
++    if(demodPin_1_Detected){
++        val = gpio_get_value(s_demodReset_1_Pin);
++    }
++
++    return val;
++}
++
++static int get_ant_power_1_pin(void)
++{
++    int val = 0;
++    if(antPowerPin_1_Detected){
++        val = gpio_get_value(s_antPower_1_Pin);
++    }
++
++    return val;
++}
++
++static int get_demod_reset_2_pin(void)
++{
++    int val = 0;
++    if(demodPin_2_Detected){
++        val = gpio_get_value(s_demodReset_2_Pin);
++    }
++
++    return val;
++}
++
++static int get_ant_power_2_pin(void)
++{
++    int val = 0;
++    if(antPowerPin_2_Detected){
++        val = gpio_get_value(s_antPower_2_Pin);
++    }
++
++    return val;
++}
++
++static int get_tuner_power_enable_1_pin(void)
++{
++    int val = 0;
++    if(tunerPowerEnablePin_1_Detected){
++        val = gpio_get_value(s_tunerPowerEnable_1_Pin);
++    }
++
++    return val;
++}
++
++static int get_tuner_power_enable_2_pin(void)
++{
++    int val = 0;
++    if(tunerPowerEnablePin_2_Detected){
++        val = gpio_get_value(s_tunerPowerEnable_2_Pin);
++    }
++
++    return val;
++}
++
++static int get_user_defined_1_pin(void)
++{
++    int val = 0;
++    if(userDefined_1_Detected){
++        val = gpio_get_value(s_userDefined_1_Pin);
++    }
++
++    return val;
++}
++
++static int get_user_defined_2_pin(void)
++{
++    int val = 0;
++    if(userDefined_2_Detected){
++        val = gpio_get_value(s_userDefined_2_Pin);
++    }
++
++    return val;
++}
++
++static ssize_t stb_show_demod_reset_1_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++    if(demodPin_1_Detected)
++        ret = sprintf(buf, "%d\n", get_demod_reset_1_pin());
++    else
++        ret = sprintf(buf, "error : demod reset 1 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_demod_reset_1_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_demod_reset_1_pin(0);
++    else
++        set_demod_reset_1_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_ant_power_1_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(antPowerPin_1_Detected)
++        ret = sprintf(buf, "%d\n", get_ant_power_1_pin());
++    else
++        ret = sprintf(buf, "error : ant power 1 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_ant_power_1_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_ant_power_1_pin(0);
++    else
++        set_ant_power_1_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_tuner_power_enable_1_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(tunerPowerEnablePin_1_Detected)
++        ret = sprintf(buf, "%d\n", get_tuner_power_enable_1_pin());
++    else
++        ret = sprintf(buf, "error : tuner power enable 1 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_tuner_power_enable_1_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_tuner_power_enable_1_pin(0);
++    else
++        set_tuner_power_enable_1_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_demod_reset_2_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(demodPin_2_Detected)
++        ret = sprintf(buf, "%d\n", get_demod_reset_2_pin());
++    else
++        ret = sprintf(buf, "error : demod reset 2 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_demod_reset_2_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_demod_reset_2_pin(0);
++    else
++        set_demod_reset_2_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_ant_power_2_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(antPowerPin_2_Detected)
++        ret = sprintf(buf, "%d\n", get_ant_power_2_pin());
++    else
++        ret = sprintf(buf, "error : ant power 2 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_ant_power_2_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_ant_power_2_pin(0);
++    else
++        set_ant_power_2_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_tuner_power_enable_2_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(tunerPowerEnablePin_2_Detected)
++        ret = sprintf(buf, "%d\n", get_tuner_power_enable_2_pin());
++    else
++        ret = sprintf(buf, "error : tuner power enable 2 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_tuner_power_enable_2_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_tuner_power_enable_2_pin(0);
++    else
++        set_tuner_power_enable_2_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_user_defined_1_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(userDefined_1_Detected)
++        ret = sprintf(buf, "%d\n", get_user_defined_1_pin());
++    else
++        ret = sprintf(buf, "error : user defined 1 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_user_defined_1_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_user_defined_1_pin(0);
++    else
++        set_user_defined_1_pin(1);
++
++    return size;
++}
++
++static ssize_t stb_show_user_defined_2_pin(struct class *class,
++                   struct class_attribute *attr, char *buf)
++{
++    ssize_t ret = 0;
++
++    if(userDefined_2_Detected)
++        ret = sprintf(buf, "%d\n", get_user_defined_2_pin());
++    else
++        ret = sprintf(buf, "error : user defined 2 pin not config..\n");
++
++    return ret;
++}
++
++static ssize_t stb_store_user_defined_2_pin(struct class *class,
++                struct class_attribute *attr, const char *buf,
++                size_t size)
++{
++    if (!strncmp("0", buf, 1))
++        set_user_defined_2_pin(0);
++    else
++        set_user_defined_2_pin(1);
++
++    return size;
++}
++
++static struct class_attribute dtv_params_class_attrs[] = {
++    __ATTR(demod_reset_1_pin, S_IRUGO | S_IWUGO, stb_show_demod_reset_1_pin,
++           stb_store_demod_reset_1_pin),
++    __ATTR(ant_power_1_pin, S_IRUGO | S_IWUGO, stb_show_ant_power_1_pin,
++           stb_store_ant_power_1_pin),
++    __ATTR(tuner_power_enable_1_pin, S_IRUGO | S_IWUGO, stb_show_tuner_power_enable_1_pin,
++           stb_store_tuner_power_enable_1_pin),
++    __ATTR(demod_reset_2_pin, S_IRUGO | S_IWUGO, stb_show_demod_reset_2_pin,
++           stb_store_demod_reset_2_pin),
++    __ATTR(ant_power_2_pin, S_IRUGO | S_IWUGO, stb_show_ant_power_2_pin,
++           stb_store_ant_power_2_pin),
++    __ATTR(tuner_power_enable_2_pin, S_IRUGO | S_IWUGO, stb_show_tuner_power_enable_2_pin,
++           stb_store_tuner_power_enable_2_pin),
++    __ATTR(user_defined_1_pin, S_IRUGO | S_IWUGO, stb_show_user_defined_1_pin,
++           stb_store_user_defined_1_pin),
++    __ATTR(user_defined_2_pin, S_IRUGO | S_IWUGO, stb_show_user_defined_2_pin,
++           stb_store_user_defined_2_pin),
++
++    __ATTR_NULL
++};
++
++
++static struct class dtv_params_class = {
++    .name = "dtv-params",
++    .class_attrs = dtv_params_class_attrs,
++};
++
++static int dtv_params_probe(struct platform_device *pdev)
++{
++    int ret = 0;
++
++    pr_inf("probe dtv params driver : start\n");
++
++    if (pdev->dev.of_node) {
++        s_demodReset_1_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "demod_reset_1-gpio", 0, NULL);
++        s_antPower_1_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "ant_power_1-gpio", 0, NULL);
++        s_tunerPowerEnable_1_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "tuner_power_enable_1-gpio", 0, NULL);
++        s_demodReset_2_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "demod_reset_2-gpio", 0, NULL);
++        s_antPower_2_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "ant_power_2-gpio", 0, NULL);
++        s_tunerPowerEnable_2_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "tuner_power_enable_2-gpio", 0, NULL);
++        s_userDefined_1_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "user_defined_1-gpio", 0, NULL);
++        s_userDefined_2_Pin = of_get_named_gpio_flags(pdev->dev.of_node, "user_defined_2-gpio", 0, NULL);
++
++        if (!gpio_is_valid(s_demodReset_1_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_demodReset_1_Pin=%d\n",
++                   pdev->dev.of_node->full_name, s_demodReset_1_Pin);
++        }
++        else{
++            demodPin_1_Detected = 1;
++            gpio_request(s_demodReset_1_Pin, "dtv_params");
++            gpio_direction_output(s_demodReset_1_Pin, 1);
++        }
++
++        if (!gpio_is_valid(s_antPower_1_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_antPower_1_Pin=%d, skip this pin\n",
++                   pdev->dev.of_node->full_name, s_antPower_1_Pin);
++        }
++        else{
++            antPowerPin_1_Detected = 1;
++            gpio_request(s_antPower_1_Pin, "dtv_params");
++            gpio_direction_output(s_antPower_1_Pin, 0); //ant power default set to low
++        }
++
++        if (!gpio_is_valid(s_tunerPowerEnable_1_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_tunerPowerEnable_1_Pin=%d, skip this pin\n",
++                   pdev->dev.of_node->full_name, s_tunerPowerEnable_1_Pin);
++        }
++        else{
++            tunerPowerEnablePin_1_Detected = 1;
++            gpio_request(s_tunerPowerEnable_1_Pin, "dtv_params");
++            gpio_direction_output(s_tunerPowerEnable_1_Pin, 0); //ant tuner power enable default set to off
++        }
++
++        if (!gpio_is_valid(s_demodReset_2_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_demodReset_2_Pin=%d\n",
++                   pdev->dev.of_node->full_name, s_demodReset_2_Pin);
++        }
++        else{
++            demodPin_2_Detected = 1;
++            gpio_request(s_demodReset_2_Pin, "dtv_params");
++            gpio_direction_output(s_demodReset_2_Pin, 1);
++        }
++
++        if (!gpio_is_valid(s_antPower_2_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_antPower_2_Pin=%d, skip this pin\n",
++                   pdev->dev.of_node->full_name, s_antPower_2_Pin);
++        }
++        else{
++            antPowerPin_2_Detected = 1;
++            gpio_request(s_antPower_2_Pin, "dtv_params");
++            gpio_direction_output(s_antPower_2_Pin, 0); //ant power default set to low
++        }
++
++        if (!gpio_is_valid(s_tunerPowerEnable_2_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_tunerPowerEnable_2_Pin=%d, skip this pin\n",
++                   pdev->dev.of_node->full_name, s_tunerPowerEnable_2_Pin);
++        }
++        else{
++            tunerPowerEnablePin_2_Detected = 1;
++            gpio_request(s_tunerPowerEnable_2_Pin, "dtv_params");
++            gpio_direction_output(s_tunerPowerEnable_2_Pin, 0); //ant tuner power enable default set to off
++        }
++
++        if (!gpio_is_valid(s_userDefined_1_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_userDefined_1_Pin=%d, skip this pin\n",
++                   pdev->dev.of_node->full_name, s_userDefined_1_Pin);
++        }
++        else{
++            userDefined_1_Detected = 1;
++            gpio_request(s_userDefined_1_Pin, "dtv_params");
++            gpio_direction_output(s_userDefined_1_Pin, 0); //default set to low
++        }
++
++        if (!gpio_is_valid(s_userDefined_2_Pin)) {
++            pr_err("%s: invalid GPIO pin, s_userDefined_2_Pin=%d, skip this pin\n",
++                   pdev->dev.of_node->full_name, s_userDefined_2_Pin);
++        }
++        else{
++            userDefined_2_Detected = 1;
++            gpio_request(s_userDefined_2_Pin, "dtv_params");
++            gpio_direction_output(s_userDefined_2_Pin, 0); //default set to low
++        }
++
++        s_pinctrl = devm_pinctrl_get_select(&pdev->dev, "default");
++        pr_err("set pinctrl : %p\n", s_pinctrl);
++
++        if (class_register(&dtv_params_class) < 0) {
++            pr_error("register class error\n");
++            goto error;
++        }
++    }
++
++    pr_inf("probe dtv params driver : end\n");
++
++    return 0;
++error:
++
++    return ret;
++}
++
++static int dtv_params_remove(struct platform_device *pdev)
++{
++    if (s_pinctrl) {
++        devm_pinctrl_put(s_pinctrl);
++        s_pinctrl = NULL;
++    }
++
++    return 0;
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id dtv_params_dt_match[] = {
++    {
++     .compatible = "dtv-params",
++     },
++    {},
++};
++#endif /*CONFIG_OF */
++
++static struct platform_driver dtv_params_driver = {
++    .probe = dtv_params_probe,
++    .remove = dtv_params_remove,
++    .driver = {
++           .name = "dtv-params",
++           .owner = THIS_MODULE,
++#ifdef CONFIG_OF
++           .of_match_table = dtv_params_dt_match,
++#endif
++           }
++};
++
++static int __init dtv_params_init(void)
++{
++    pr_dbg("dtv params init\n");
++    return platform_driver_register(&dtv_params_driver);
++}
++
++static void __exit dtv_params_exit(void)
++{
++    pr_dbg("dtv params exit\n");
++    platform_driver_unregister(&dtv_params_driver);
++}
++
++module_init(dtv_params_init);
++module_exit(dtv_params_exit);
++
++MODULE_DESCRIPTION("driver for the AMLogic dtv params");
++MODULE_AUTHOR("AMLOGIC");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/amlogic/input/remote/remote_meson.c b/drivers/amlogic/input/remote/remote_meson.c
+index ffb1ad6..e352c37 100644
+--- a/drivers/amlogic/input/remote/remote_meson.c
++++ b/drivers/amlogic/input/remote/remote_meson.c
+@@ -458,7 +458,8 @@ static int get_custom_tables(struct device_node *node,
+ 		memset(&ptable->tab.cursor_code, 0xff,
+ 					sizeof(struct cursor_codemap));
+ 
+-		if (strcmp(ptable->tab.custom_name, "khadas-ir") == 0) {
++		if ((strcmp(ptable->tab.custom_name, "khadas-ir") == 0) ||
++			(strcmp(ptable->tab.custom_name, "dvb-ir") == 0)) {
+ 		        ret = of_property_read_u32(map, "fn_key_scancode", &value);
+ 		        if (ret) {
+ 		                dev_err(chip->dev, "please config fn_key_scancode item\n");
+@@ -469,9 +470,9 @@ static int get_custom_tables(struct device_node *node,
+ 		        ret = of_property_read_u32(map, "fn_key_scancode_other", &value);
+ 		        if (ret) {
+ 		                dev_err(chip->dev, "please config fn_key_scancode_other item\n");
+-		                goto err;
+-		        }
+-		        ptable->tab.cursor_code.fn_key_scancode_other = value;
++		        } else {
++                        ptable->tab.cursor_code.fn_key_scancode_other = value;
++                }
+ 
+ 		        ret = of_property_read_u32(map, "cursor_left_scancode", &value);
+ 		        if (ret) {
+diff --git a/include/linux/amlogic/amports/timestamp.h b/include/linux/amlogic/amports/timestamp.h
+index 1d2c7df..1df3baf 100644
+--- a/include/linux/amlogic/amports/timestamp.h
++++ b/include/linux/amlogic/amports/timestamp.h
+@@ -48,6 +48,8 @@ extern u32 timestamp_pcrscr_enable_state(void);
+ 
+ extern void timestamp_pcrscr_set_adj(s32 inc);
+ 
++extern void timestamp_pcrscr_set_adj_pcr(s32 inc);
++
+ extern void timestamp_apts_enable(u32 enable);
+ 
+ extern void timestamp_apts_start(u32 enable);
+-- 
+1.9.1
+
